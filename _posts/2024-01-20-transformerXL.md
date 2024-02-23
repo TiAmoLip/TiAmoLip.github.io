@@ -42,6 +42,8 @@ $$
 
 稍后让我去labml-nn的代码那块仔细想想，代码中是否体现了这一点。
 
+(labml-nn的实现里，RPE和论文中公式不同，属于是一种简化但是能说服自己的实现。同时这里的实现中，transformerXL是一种不同于transformer的Encoder-Decoder结构，他是直接input-output。但是由于它mem的使用是写在forward的参数里的，看不出来依赖关系的递进)
+
 ### Relative Position Encodings
 transformerXL放弃绝对位置编码的主要原因在于他会对多个segment做类似rnn的操作，此时你这个多个segment的绝对位置编码其实是一样的。多个segments之间无法区分位置关系，就像论文中写的
 $$\begin{aligned}
@@ -63,18 +65,11 @@ $$\begin{aligned}
 &+\underbrace{u^\top \mathbf{W}_{k,E}\mathbf{E}_{x_j}}_{(c)}+\underbrace{v^\top\mathbf{W}_{k,R}\mathbf{R}_{i-j}}_{(d)}.
 \end{aligned}$$
 
-大家全都变了,而且变得挺抽象的。主要三方面:
+这里相当于我们完全抛弃了绝对位置编码，改为相对位置编码。
 
 1. $R_{i-j}$比较好理解，由于只用了$i$前面的段，所以$i-j\geqslant 0$, 且不用学习，理解成$i-j$都没有问题。
-2. 令我费解的就是$u$和$v$的引入。作者的原话是
-    ```
-   In this case, since the query vector is the same for all query positions,
-   it suggests that the attentive bias towards different words should 
-        remain the same regardless of the query position
-   ```
-   因此他们直接替换了$U_i^T W_q$, 但我实在没看懂为什么会有跟绝对位置无关。
-3. 接着引入了两个矩阵，目的分别是输出content-based key vectors和location-based key vectors。这个可以结合他们后面乘的那个矩阵理解。但我只能说合理，不知道为什么要引入他俩。
+2. 既然是相对位置，参照那个展开式，中间就不应该保有绝对位置。所以用俩可训练参数$u,v$来代替。
 
-这样，(c) 确保了整体的content-bias，(d) 则确保了整体的position bias。
+3. 接着引入了两个矩阵，目的分别是输出content-based key vectors和location-based key vectors。如果你不引入的话，你最后两项相当于共享$W_k$, 这在式子上并不能看出共享有什么意义。分开反而更加突出各自的作用。(c) 确保了整体的content-bias，(d) 则确保了整体的position bias。
 
 完整的流程公式可以直接看论文。
